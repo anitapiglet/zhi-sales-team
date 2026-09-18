@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知英語 銷售管理系統（團隊協作版）</title>
+<style>
+:root{
+  --bg:#FBF1E7;
+  --card:#FFFFFF;
+  --sidebar:#FFF9F2;
+  --primary:#E07B39;
+  --primary-dark:#C05E24;
+  --primary-soft:#FCE8D7;
+  --blue:#4A7BD8;
+  --blue-soft:#E7EEFB;
+  --green:#3E9B5F;
+  --green-soft:#E3F2E8;
+  --red:#D9534F;
+  --red-soft:#FBE5E4;
+  --purple:#8A63C8;
+  --purple-soft:#EFE8FA;
+  --text:#3A3A3A;
+  --muted:#8B8B8B;
+  --line:#F0E2D3;
+  --shadow:0 4px 20px rgba(224,123,57,.08);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  font-family:"PingFang TC","Microsoft JhengHei","Noto Sans TC",system-ui,-apple-system,sans-serif;
+  background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;
+}
+#app{display:flex;min-height:100vh;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-thumb{background:#E8D5C0;border-radius:8px;}
+::-webkit-scrollbar-track{background:transparent;}
+.hidden{display:none !important;}
+
+/* ===== 登入畫面 ===== */
+#loginScreen{
+  position:fixed;inset:0;background:linear-gradient(135deg,#FBF1E7,#FCE8D7);z-index:500;
+  display:flex;align-items:center;justify-content:center;padding:20px;
+}
+.login-box{background:#fff;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.15);padding:36px 32px;width:100%;max-width:380px;}
+.login-box .logo{width:52px;height:52px;border-radius:16px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;margin:0 auto 16px;box-shadow:0 6px 16px rgba(224,123,57,.35);}
+.login-box h2{text-align:center;font-size:19px;font-weight:800;margin-bottom:4px;}
+.login-box p.sub{text-align:center;font-size:12.5px;color:var(--muted);margin-bottom:22px;}
+.login-box label{display:block;font-size:12.5px;font-weight:700;color:#6B5640;margin-bottom:6px;margin-top:14px;}
+.login-box input{width:100%;padding:11px 14px;border-radius:10px;border:1px solid var(--line);font-size:14px;font-family:inherit;outline:none;background:#FFFDFA;}
+.login-box input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(224,123,57,.12);}
+.login-box button{width:100%;margin-top:20px;padding:12px;border-radius:10px;border:none;background:var(--primary);color:#fff;font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit;}
+.login-box button:hover{background:var(--primary-dark);}
+.login-box .err{color:var(--red);font-size:12.5px;margin-top:10px;text-align:center;min-height:16px;}
+.login-box .note{margin-top:16px;font-size:11.5px;color:var(--muted);text-align:center;line-height:1.7;}
+#connStatus{position:fixed;bottom:16px;right:16px;z-index:120;font-size:11.5px;padding:6px 12px;border-radius:999px;background:#fff;border:1px solid var(--line);color:var(--muted);box-shadow:var(--shadow);}
+#connStatus.ok{color:var(--green);border-color:var(--green-soft);}
+#connStatus.bad{color:var(--red);border-color:var(--red-soft);}
+
+/* ===== Sidebar ===== */
+.sidebar{
+  width:236px;flex-shrink:0;background:var(--sidebar);
+  border-right:1px solid var(--line);
+  display:flex;flex-direction:column;padding:22px 14px;position:sticky;top:0;height:100vh;
+}
+.brand{display:flex;align-items:center;gap:12px;padding:4px 10px 22px;}
+.brand .logo{
+  width:44px;height:44px;border-radius:14px;background:var(--primary);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;flex-shrink:0;
+  box-shadow:0 4px 12px rgba(224,123,57,.35);
+}
+.brand h1{font-size:18px;font-weight:800;letter-spacing:1px;}
+.brand p{font-size:11px;color:var(--muted);letter-spacing:2px;}
+.nav{flex:1;display:flex;flex-direction:column;gap:6px;overflow-y:auto;}
+.nav-item{
+  display:flex;align-items:center;gap:11px;width:100%;padding:11px 14px;border:none;background:transparent;
+  border-radius:12px;font-size:14px;color:var(--text);cursor:pointer;text-align:left;font-family:inherit;transition:all .15s;
+}
+.nav-item .ico{font-size:17px;width:20px;text-align:center;flex-shrink:0;}
+.nav-item:hover{background:var(--primary-soft);}
+.nav-item.active{background:var(--primary);color:#fff;font-weight:600;box-shadow:0 4px 14px rgba(224,123,57,.3);}
+.sidebar-foot{padding:12px 10px 0;font-size:11px;color:var(--muted);text-align:center;border-top:1px solid var(--line);margin-top:10px;display:flex;flex-direction:column;gap:8px;}
+.sidebar-foot button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px;font-size:12px;color:var(--text);cursor:pointer;font-family:inherit;}
+.sidebar-foot button:hover{background:var(--red-soft);color:var(--red);border-color:var(--red);}
+
+/* ===== Main ===== */
+.main{flex:1;min-width:0;padding:26px 28px;display:flex;flex-direction:column;gap:18px;}
+.page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.page-head h2{font-size:22px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.page-head .sub{font-size:13px;color:var(--muted);margin-top:2px;}
+.head-actions{display:flex;gap:10px;flex-wrap:wrap;}
+.card{background:var(--card);border-radius:16px;border:1px solid var(--line);box-shadow:var(--shadow);padding:18px 20px;}
+
+/* ===== Buttons ===== */
+.btn{
+  display:inline-flex;align-items:center;gap:7px;padding:9px 16px;border-radius:10px;border:none;cursor:pointer;
+  font-size:13px;font-weight:600;font-family:inherit;background:var(--blue-soft);color:var(--blue);transition:all .15s;white-space:nowrap;
+}
+.btn:hover{background:var(--blue);color:#fff;}
+.btn.primary{background:var(--primary);color:#fff;box-shadow:0 4px 12px rgba(224,123,57,.28);}
+.btn.primary:hover{background:var(--primary-dark);}
+.btn.ghost{background:#fff;border:1px solid var(--line);color:var(--text);}
+.btn.ghost:hover{background:var(--bg);}
+.btn.danger{background:var(--red-soft);color:var(--red);}
+.btn.danger:hover{background:var(--red);color:#fff;}
+.btn.success{background:var(--green-soft);color:var(--green);}
+.btn.success:hover{background:var(--green);color:#fff;}
+.btn.mini{padding:5px 12px;font-size:12px;border-radius:8px;}
+.icon-btn{
+  width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer;
+  font-size:18px;color:var(--text);display:flex;align-items:center;justify-content:center;transition:all .15s;font-family:inherit;
+}
+.icon-btn:hover{background:var(--primary-soft);border-color:var(--primary);color:var(--primary);}
+
+/* ===== Calendar ===== */
+.cal-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.cal-toolbar h3{font-size:19px;font-weight:800;min-width:130px;text-align:center;}
+.calendar{background:var(--card);border-radius:16px;border:1px solid var(--line);box-shadow:var(--shadow);padding:16px 18px 18px;}
+.cal-weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:8px;}
+.cal-weekdays div{text-align:center;font-size:12px;font-weight:700;color:var(--muted);padding:6px 0;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+.cal-cell{
+  min-height:78px;border-radius:12px;border:1px solid var(--line);background:#fffdfa;padding:7px 8px;cursor:pointer;
+  transition:all .15s;display:flex;flex-direction:column;gap:4px;position:relative;
+}
+.cal-cell:hover{border-color:var(--primary);background:var(--primary-soft);}
+.cal-cell.empty{visibility:hidden;}
+.cal-cell.selected{background:var(--blue-soft);border-color:var(--blue);box-shadow:0 0 0 2px rgba(74,123,216,.18);}
+.cal-cell.today{border-color:var(--primary);border-width:2px;}
+.cal-num{font-size:14px;font-weight:700;color:var(--text);}
+.cal-badges{display:flex;flex-direction:column;gap:3px;margin-top:auto;}
+.cal-pill{display:inline-flex;align-items:center;font-size:10px;font-weight:700;border-radius:999px;padding:2px 7px;color:#fff;width:max-content;}
+
+/* ===== Cards/list/forms shared ===== */
+.grid-2{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;}
+.list{display:flex;flex-direction:column;gap:8px;}
+.list-item{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:12px;border:1px solid var(--line);background:#fffdfa;}
+.list-item .li-body{flex:1;min-width:0;}
+.li-title{font-weight:700;font-size:14px;}
+.li-meta{font-size:12px;color:var(--muted);margin-top:2px;}
+.empty-state{color:var(--muted);font-size:13px;text-align:center;padding:26px 10px;}
+.badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap;}
+.tag{display:inline-block;font-size:11px;background:#F7EFE5;color:#8A6A4A;padding:2px 8px;border-radius:6px;margin-right:4px;}
+.row{display:flex;gap:10px;flex-wrap:wrap;}
+.row>*{flex:1;min-width:130px;}
+.field{display:flex;flex-direction:column;gap:6px;}
+.field label{font-size:12.5px;font-weight:700;color:#6B5640;}
+input,select,textarea{padding:9px 12px;border-radius:10px;border:1px solid var(--line);font-size:13.5px;font-family:inherit;outline:none;background:#FFFDFA;color:var(--text);width:100%;}
+input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(224,123,57,.12);}
+.help-dot{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:999px;border:1.4px solid var(--muted);color:var(--muted);font-size:11.5px;font-weight:700;cursor:pointer;background:transparent;position:relative;}
+.help-dot:hover{border-color:var(--primary);color:var(--primary);}
+.help-tip{position:absolute;z-index:80;bottom:24px;left:50%;transform:translateX(-50%);background:#3A3A3A;color:#fff;font-size:11.5px;line-height:1.5;padding:8px 10px;border-radius:8px;width:220px;box-shadow:0 6px 18px rgba(0,0,0,.18);display:none;}
+.help-dot:hover .help-tip{display:block;}
+
+/* ===== Modal ===== */
+.modal-overlay{position:fixed;inset:0;background:rgba(60,40,20,.45);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.hidden{display:none;}
+.modal{background:#fff;border-radius:18px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.22);padding:24px 26px;position:relative;}
+.modal-close{position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:15px;color:var(--muted);display:flex;align-items:center;justify-content:center;font-family:inherit;}
+.modal-close:hover{background:var(--red-soft);color:var(--red);border-color:var(--red);}
+.modal-title{font-size:17px;font-weight:800;padding-right:32px;margin-bottom:4px;}
+.modal-sub{font-size:12px;color:var(--muted);margin-bottom:14px;}
+.modal-foot{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
+
+/* ===== Toast ===== */
+#toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(80px);background:#3A3A3A;color:#fff;padding:11px 22px;border-radius:12px;font-size:13.5px;font-weight:600;z-index:200;opacity:0;transition:all .3s;box-shadow:0 8px 24px rgba(0,0,0,.25);pointer-events:none;white-space:nowrap;}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ===== Stats ===== */
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;}
+.stat-card{background:var(--card);border-radius:14px;border:1px solid var(--line);box-shadow:var(--shadow);padding:16px 18px;}
+.stat-card .s-label{font-size:12px;color:var(--muted);}
+.stat-card .s-num{font-size:24px;font-weight:800;margin-top:4px;}
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:14px;overflow-x:auto;}
+.tabs button{border:none;background:transparent;padding:9px 4px;font-size:13.5px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;margin-right:16px;font-family:inherit;}
+.tabs button.active{color:var(--primary-dark);border-bottom-color:var(--primary);}
+.chip-list{display:flex;flex-wrap:wrap;gap:8px;}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:7px 13px;border-radius:999px;background:var(--primary-soft);color:var(--primary-dark);font-size:13px;font-weight:600;}
+.chip .chip-x{width:18px;height:18px;border-radius:50%;background:rgba(224,123,57,.2);color:var(--primary-dark);border:none;cursor:pointer;font-size:11px;font-family:inherit;}
+.table-wrap{overflow-x:auto;border-radius:14px;border:1px solid var(--line);background:#fff;}
+table.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:560px;}
+.tbl th{text-align:left;padding:11px 13px;background:#FDF6EE;color:#8A6A4A;font-size:12px;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;}
+.tbl td{padding:10px 13px;border-bottom:1px solid #F7EFE5;vertical-align:middle;}
+
+@media (max-width:1000px){
+  .sidebar{width:100%;height:auto;position:static;flex-direction:row;flex-wrap:wrap;align-items:center;}
+  .nav{flex-direction:row;flex-wrap:wrap;}
+  .brand{padding:4px 10px 8px;width:100%;}
+  .main{padding:16px 14px;}
+  .grid-2,.grid-3{grid-template-columns:1fr;}
+  .row{flex-direction:column;}
+}
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="logo">知</div>
+    <h2>知英語銷售系統</h2>
+    <p class="sub">團隊協作版 · 請用您的帳號登入</p>
+    <label>Email</label>
+    <input id="loginEmail" type="email" placeholder="you@example.com" autocomplete="username">
+    <label>密碼</label>
+    <input id="loginPassword" type="password" placeholder="密碼" autocomplete="current-password">
+    <button id="loginBtn">登入</button>
+    <div class="err" id="loginErr"></div>
+    <div class="note">帳號由管理員在 Firebase Console 建立，忘記密碼請聯繫管理員重設。</div>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">知</div>
+      <div><h1>知英語</h1><p>銷售管理系統</p></div>
+    </div>
+    <nav class="nav" id="navList"></nav>
+    <div class="sidebar-foot">
+      <span id="currentUserLabel">—</span>
+      <button id="logoutBtn">登出</button>
+    </div>
+  </aside>
+  <main class="main" id="mainArea"></main>
+</div>
+
+<div id="connStatus">連線中…</div>
+<div class="modal-overlay hidden" id="modalOverlay"><div class="modal" id="modalBox"></div></div>
+<div id="toast"></div>
+
+<script type="module" src="firebase.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
