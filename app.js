@@ -108,6 +108,7 @@ function run30hrsAutomation(){
     if(!ct.course || ct.course.indexOf("30hrs")===-1) return;
     if(!ct.startDate || !ct.endDate) return;
     var rules = [
+      {key:"firstClass", date:ct.startDate, title:"關心 "+ct.name+" 第一堂課"},
       {key:"week2", date:addDays(ct.startDate,7), title:ct.name+" 預約寫作/口說 實戰課程"},
       {key:"mockAfter", date:addDays(ct.endDate,-7), title:ct.name+" Mock test after"},
       {key:"missHw", date:addDays(ct.endDate,-7), title:"詢問老師 "+ct.name+" 缺作業"},
@@ -123,6 +124,7 @@ function run30hrsAutomation(){
       }
     });
   });
+  if(changed) save();
   return changed;
 }
 
@@ -172,6 +174,7 @@ var HELP = {
   track:{t:"課程學生追蹤", w:"『一般課程』分頁：成交紀錄自動同步到這裡；課程含『30hrs』且填了開課/結束日期會自動產生待辦。『一對一』分頁另外追蹤一對一教學狀態。", h:"上方可搜尋學生姓名；開課/結束日期要到銷售管理編輯。", r:"30hrs自動待辦會出現在『待辦提醒』。", u:"刪除此列不影響原始成交紀錄。", e:"沒看到自動待辦請確認課程名稱含『30hrs』。"},
   oneonone:{t:"一對一母分頁", w:"追蹤一對一教學的老師/付款/上課時間/科目，學生填入程度檢測日期後會自動出現在這裡。", h:"卡片上的付款狀態下拉可快速切換；點『編輯』填寫老師、金額、上課時間與科目。", r:"付款狀態改成『已付款』會自動同步一筆到『一般課程』課程學生追蹤。", u:"可在編輯視窗刪除整筆；已付款自動同步的追蹤列可在課程學生追蹤刪除，不影響這裡的原始資料。", e:"若找不到某位學生，先確認學生資訊裡有沒有填程度檢測日期。"},
   install:{t:"刷卡分期追蹤", w:"依付款方式自動判斷分幾期，把總金額拆成每期金額，依購買月份往後排到對應月份，讓每月的營業額計算正確。", h:"用上/本/下月切換要看哪個月；『本月正確營業額』已自動把分期金額拆算進去。", r:"純資訊呈現，不會修改任何成交紀錄。", u:"無需撤銷。", e:"若某筆分期沒出現，檢查付款方式名稱是否包含『分X期』文字。"},
+  trialcal:{t:"體驗課行事曆", w:"依日期+時間排序，列出所有已安排體驗課的學生，一次看清楚誰幾點上什麼類型的體驗課。", h:"到學生資訊填入體驗課日期/時間/類型即會出現在這裡；點『編輯』可修改。", r:"純檢視列表，不會另外儲存資料。", u:"無需撤銷。", e:"若學生沒出現，檢查是否已填體驗課日期。"},
   calc:{t:"價格試算", w:"快速試算一對一課程折扣價，以及三種固定費率方案的總金額。", h:"輸入堂數，下方會即時重新計算。", r:"純計算工具，不會儲存任何資料。", u:"無需撤銷。", e:"若金額看起來不對，確認堂數是否輸入為整數。"},
   sales:{t:"銷售管理", w:"記錄每筆成交，自動同步課程學生追蹤。", h:"『＋新增成交紀錄』填寫；付款方式可篩選並個別匯出。", r:"計入總營收與客單價。", u:"刪除會一併移除對應課程追蹤列。", e:"客單價異常請檢查金額輸入。"},
   todo:{t:"待辦提醒", w:"顯示手動新增的提醒，以及30hrs課程自動產生的5條待辦規則。", h:"可手動新增；勾選完成；30hrs自動待辦無法手動刪除文字但可勾完成或刪除整筆。", r:"完成後會標記已完成，仍保留在清單。", u:"取消勾選即可復原。", e:"若預期的自動待辦沒出現，檢查課程學生追蹤是否填了開課/結束日期。"}
@@ -202,6 +205,7 @@ var NAV = [
   {key:"students", label:"學生資訊", ico:"🎓"},
   {key:"seminar", label:"講座名單", ico:"🎤"},
   {key:"track", label:"課程學生追蹤", ico:"📘"},
+  {key:"trialcal", label:"體驗課行事曆", ico:"⏰"},
   {key:"sales", label:"銷售管理", ico:"💳"},
   {key:"calc", label:"價格試算", ico:"🧮"},
   {key:"todo", label:"待辦提醒", ico:"✅"},
@@ -214,17 +218,19 @@ var seminarMonth = todayStr().slice(0,7);
 var salesPay = "全部";
 var installMonth = todayStr().slice(0,7);
 var trackSearch = "", trackView = "general", ooSearch = "";
-var calcSessions = 10;
+var calcOOSessions = 10, calc390Sessions = 10, calc450Sessions = 10, calc500Sessions = 10;
 var TEACHERS = ["Joanna","Florence","Jake","Other"];
 var SUBJECTS = ["聽","說","讀","寫"];
 
 var STAGES = [
-  {key:"進到官方LINE", color:"#8B8B8B"}, {key:"程度檢測", color:"#8A63C8"}, {key:"Intro", color:"#4A7BD8"},
-  {key:"體驗課/線上講座", color:"#E07B39"}, {key:"Demo", color:"#C05E24"}, {key:"已購買", color:"#3E9B5F"}, {key:"lost deal", color:"#D9534F"}
+  {key:"保證金未付", color:"#D9534F"}, {key:"程度檢測", color:"#8A63C8"},
+  {key:"體驗課/講座進行中", color:"#E07B39"}, {key:"Demo", color:"#C05E24"},
+  {key:"考慮中", color:"#8B8B8B"}, {key:"已購買", color:"#3E9B5F"}, {key:"lost deal", color:"#6B6B6B"}
 ];
-var STATUS_DATE_FIELD = {"進到官方LINE":"lineJoinDate","程度檢測":"assessDate","Intro":"introDate","體驗課/線上講座":"trialDate","Demo":"demoDate","已購買":"purchaseDate","lost deal":"lostDate"};
+var DEFAULT_STATUS = "保證金未付";
+var STATUS_DATE_FIELD = {"程度檢測":"assessDate","體驗課/講座進行中":"trialDate","Demo":"demoDate","已購買":"purchaseDate","lost deal":"lostDate"};
 var FUNNEL_FIELDS = [{field:"lineJoinDate",label:"加入LINE"},{field:"introDate",label:"Intro"},{field:"trialDate",label:"體驗/線上講座"},{field:"demoDate",label:"Demo"},{field:"purchaseDate",label:"已購買"}];
-var SEMINAR_FIELDS = [{field:"signedUpDate",label:"報名"},{field:"lineJoinDate",label:"加入LINE"},{field:"consultDate",label:"諮詢"},{field:"purchaseDate",label:"成交"}];
+var SEMINAR_FIELDS = [{field:"signedUpDate",label:"報名"},{field:"consultDate",label:"諮詢"},{field:"purchaseDate",label:"成交"}];
 function stageBadge(stage){
   var m = STAGES.find(function(s){return s.key===stage;})||STAGES[0];
   return '<span class="badge" style="background:'+m.color+'22;color:'+m.color+'">'+escapeHtml(stage||"進到官方LINE")+'</span>';
@@ -236,24 +242,60 @@ function render(){
   if(!DB) return;
   run30hrsAutomation();
   runOneOnOneAutoCreate();
+  runDepositUnpaidReminder();
+  var active = document.activeElement;
+  var activeId = active && active.id;
+  var selStart = active && typeof active.selectionStart==="number" ? active.selectionStart : null;
+  var selEnd = active && typeof active.selectionEnd==="number" ? active.selectionEnd : null;
   document.getElementById("navList").innerHTML = NAV.map(function(n){
     return '<button class="nav-item '+(currentNav===n.key?"active":"")+'" data-nav="'+n.key+'"><span class="ico">'+n.ico+'</span>'+n.label+'</button>';
   }).join("");
-  document.querySelectorAll("[data-nav]").forEach(function(b){ b.onclick = function(){ currentNav = b.getAttribute("data-nav"); render(); }; });
   var main = document.getElementById("mainArea");
-  var renderers = {cal:renderCalendar, students:renderStudents, seminar:renderSeminar, track:renderTrack, sales:renderSales, calc:renderCalc, todo:renderTodos, settings:renderSettings};
+  var renderers = {cal:renderCalendar, students:renderStudents, seminar:renderSeminar, track:renderTrack, sales:renderSales, calc:renderCalc, todo:renderTodos, settings:renderSettings, trialcal:renderTrialCal};
   main.innerHTML = renderers[currentNav]();
-  bindActions();
-}
-function bindActions(){
-  document.querySelectorAll("[data-action]").forEach(function(el){
-    var handler = function(e){ ACTIONS[el.getAttribute("data-action")](el, e); };
-    if(el.tagName==="SELECT") el.onchange = handler;
-    else if(el.tagName==="INPUT" && (el.type==="text"||el.type===""||el.type==="search"||el.type==="number")) el.oninput = handler;
-    else el.onclick = handler;
-  });
+  if(activeId){
+    var el = document.getElementById(activeId);
+    if(el && (el.tagName==="INPUT"||el.tagName==="SELECT"||el.tagName==="TEXTAREA")){
+      el.focus();
+      if(selStart!=null && el.setSelectionRange){ try{ el.setSelectionRange(selStart, selEnd); }catch(e){} }
+    }
+  }
 }
 var ACTIONS = {};
+/* ---- 全域事件代理：一次綁定，涵蓋主頁面與彈出視窗內動態產生的所有按鈕/輸入框 ---- */
+var __debounceTimers = {};
+function debounced(key, fn, delay){
+  clearTimeout(__debounceTimers[key]);
+  __debounceTimers[key] = setTimeout(fn, delay||180);
+}
+(function bindGlobalDelegation(){
+  document.addEventListener("click", function(e){
+    var navBtn = e.target.closest("[data-nav]");
+    if(navBtn){ currentNav = navBtn.getAttribute("data-nav"); render(); return; }
+    var el = e.target.closest("[data-action]");
+    if(!el) return;
+    if(el.tagName==="SELECT") return;
+    if(el.tagName==="INPUT" && (el.type==="text"||el.type===""||el.type==="search"||el.type==="number")) return;
+    var fn = ACTIONS[el.getAttribute("data-action")];
+    if(fn) fn(el, e);
+  });
+  document.addEventListener("change", function(e){
+    var el = e.target.closest("[data-action]");
+    if(!el || el.tagName!=="SELECT") return;
+    var fn = ACTIONS[el.getAttribute("data-action")];
+    if(fn) fn(el, e);
+  });
+  document.addEventListener("input", function(e){
+    var el = e.target.closest("[data-action]");
+    if(!el || el.tagName!=="INPUT") return;
+    if(!(el.type==="text"||el.type===""||el.type==="search"||el.type==="number")) return;
+    var action = el.getAttribute("data-action");
+    var fn = ACTIONS[action];
+    if(!fn) return;
+    var elRef = el, evRef = e;
+    debounced(action+"_"+(el.id||""), function(){ fn(elRef, evRef); }, 180);
+  });
+})();
 
 /* ============= 日曆紀錄 ============= */
 function recordsOfDate(d){
@@ -340,12 +382,21 @@ ACTIONS.exportStudents = function(){
   exportExcel("知英語_學生資訊.xls","學生資訊",["姓名","狀態","加入LINE","Intro","體驗/線上講座","Demo","已購買","多益","雅思/托福","程度檢測分數","備註"], rows);
   toast("已匯出，共 "+rows.length+" 筆");
 };
+var HOUR_OPTIONS = (function(){ var a=[]; for(var h=9;h<=21;h++) a.push(pad(h)+":00"); return a; })();
+function timeSelectHtml(name, val){
+  return '<select name="'+name+'"><option value="">—</option>'+HOUR_OPTIONS.map(function(t){return '<option '+(t===val?"selected":"")+'>'+t+'</option>';}).join("")+'</select>';
+}
+function syncCustomerPurchaseToTrack(c){
+  var track = DB.courseTracking.find(function(x){return x.custId===c.id;});
+  if(!track){ track = {id:uid(), custId:c.id, deletedAt:null, startDate:todayStr(), endDate:""}; DB.courseTracking.push(track); }
+  track.name = c.name; track.course = track.course || "(來自學生資訊-已購買)"; track.note = c.note||"";
+}
 ACTIONS.openCustomerModal = function(el){
   var id = el.getAttribute("data-id"), prefill = el.getAttribute("data-prefill");
   var c = id ? DB.customers.find(function(x){return x.id===id;}) : null;
   var v = function(k){ return c?escapeHtml(c[k]||""):""; };
   var vd = function(k,d){ return c?(c[k]||""):(d||""); };
-  var statusOpts = STAGES.map(function(s){return '<option '+(c&&c.status===s.key?"selected":"")+'>'+s.key+'</option>';}).join("");
+  var statusOpts = STAGES.map(function(s){return '<option '+((c?c.status===s.key:s.key===DEFAULT_STATUS)?"selected":"")+'>'+s.key+'</option>';}).join("");
   openModal(
     '<button class="modal-close" data-action="closeModal">✕</button><div class="modal-title">'+(c?"編輯":"新增")+'學生 '+helpDot("student")+'</div>'+
     '<form id="custForm"><div class="field"><label>學生姓名</label><input name="name" required value="'+v("name")+'"></div>'+
@@ -360,8 +411,9 @@ ACTIONS.openCustomerModal = function(el){
       '<div class="field"><label>雅思/托福分數</label><input name="ieltsToeflScore" value="'+v("ieltsToeflScore")+'" placeholder="例如 6.5"></div>'+
       '<div class="field"><label>Intro 日期</label><input type="date" name="introDate" value="'+vd("introDate")+'"></div></div>'+
     '<div class="row" style="margin-top:10px">'+
-      '<div class="field"><label>線上講座日期</label><input type="date" name="onlineSeminarDate" value="'+vd("onlineSeminarDate")+'"></div>'+
-      '<div class="field"><label>體驗課/線上講座日期</label><input type="date" name="trialDate" value="'+vd("trialDate")+'"></div></div>'+
+      '<div class="field"><label>體驗課/線上講座日期</label><input type="date" name="trialDate" value="'+vd("trialDate")+'"></div>'+
+      '<div class="field"><label>體驗課時間</label>'+timeSelectHtml("trialTime", c?c.trialTime||"":"")+'</div></div>'+
+    '<div class="row" style="margin-top:10px"><div class="field"><label>體驗課類型（例如：寫作/口說/線上講座）</label><input name="trialType" value="'+v("trialType")+'"></div></div>'+
     '<div class="row" style="margin-top:10px">'+
       '<div class="field"><label>Demo 日期</label><input type="date" name="demoDate" value="'+vd("demoDate")+'"></div>'+
       '<div class="field"><label>已購買日期</label><input type="date" name="purchaseDate" value="'+vd("purchaseDate")+'"></div></div>'+
@@ -374,21 +426,27 @@ ACTIONS.openCustomerModal = function(el){
     var f = e.target;
     var obj = {name:f.name.value.trim(), status:f.status.value, lineJoinDate:f.lineJoinDate.value, assessDate:f.assessDate.value,
       assessScore:f.assessScore.value.trim(), toeicScore:f.toeicScore.value.trim(), ieltsToeflScore:f.ieltsToeflScore.value.trim(),
-      introDate:f.introDate.value, onlineSeminarDate:f.onlineSeminarDate.value, trialDate:f.trialDate.value, demoDate:f.demoDate.value,
+      introDate:f.introDate.value, trialDate:f.trialDate.value, trialTime:f.trialTime.value, trialType:f.trialType.value.trim(), demoDate:f.demoDate.value,
       purchaseDate:f.purchaseDate.value, lostDate:f.lostDate.value, note:f.note.value.trim()};
     var dField = STATUS_DATE_FIELD[obj.status];
     if(dField && !obj[dField]) obj[dField] = todayStr();
-    if(c){ Object.assign(c,obj); } else { DB.customers.push(Object.assign({id:uid(),deletedAt:null}, obj)); }
+    var target;
+    if(c){ Object.assign(c,obj); target=c; } else { target = Object.assign({id:uid(),deletedAt:null}, obj); DB.customers.push(target); }
+    if(target.status==="已購買") syncCustomerPurchaseToTrack(target);
     save(); closeModal(); toast("已儲存"); render();
   });
 };
-ACTIONS.deleteCustomer = function(el){ softDelete(DB.customers, el.getAttribute("data-id")); save(); closeModal(); toast("已刪除"); render(); };
+ACTIONS.deleteCustomer = function(el){
+  if(!confirm("確定要刪除這位學生嗎？可以之後在設定裡的垃圾桶恢復。")) return;
+  softDelete(DB.customers, el.getAttribute("data-id")); save(); closeModal(); toast("已刪除"); render();
+};
 ACTIONS.quickStatus = function(el){
   var c = DB.customers.find(function(x){return x.id===el.getAttribute("data-id");});
   if(!c) return;
   c.status = el.value;
   var dField = STATUS_DATE_FIELD[c.status];
   if(dField && !c[dField]) c[dField] = todayStr();
+  if(c.status==="已購買") syncCustomerPurchaseToTrack(c);
   save(); render(); toast("已更新「"+c.name+"」狀態");
 };
 ACTIONS.filterStudents = function(){
@@ -451,34 +509,39 @@ ACTIONS.openSeminarModal = function(el){
     '<button class="modal-close" data-action="closeModal">✕</button><div class="modal-title">'+(s?"編輯":"新增")+'講座名單 '+helpDot("seminar")+'</div>'+
     '<form id="semForm"><div class="row"><div class="field"><label>姓名</label><input name="name" required value="'+v("name")+'"></div>'+
     '<div class="field"><label>講座日期</label><input type="date" name="seminarDate" value="'+(s?s.seminarDate:todayStr())+'"></div></div>'+
-    '<div class="row" style="margin-top:10px"><div class="field"><label>電話</label><input name="phone" value="'+v("phone")+'"></div>'+
-    '<div class="field"><label>Email</label><input name="email" value="'+v("email")+'"></div></div>'+
     '<div class="row" style="margin-top:10px"><div class="field"><label>報名日期</label><input type="date" name="signedUpDate" value="'+(s?s.signedUpDate||"":todayStr())+'"></div>'+
-    '<div class="field"><label>加入LINE日期</label><input type="date" name="lineJoinDate" value="'+(s?s.lineJoinDate||"":"")+'"></div></div>'+
-    '<div class="row" style="margin-top:10px"><div class="field"><label>諮詢日期</label><input type="date" name="consultDate" value="'+(s?s.consultDate||"":"")+'"></div>'+
-    '<div class="field"><label>成交日期</label><input type="date" name="purchaseDate" value="'+(s?s.purchaseDate||"":"")+'"></div></div>'+
+    '<div class="field"><label>諮詢日期</label><input type="date" name="consultDate" value="'+(s?s.consultDate||"":"")+'"></div></div>'+
+    '<div class="row" style="margin-top:10px"><div class="field"><label>成交日期</label><input type="date" name="purchaseDate" value="'+(s?s.purchaseDate||"":"")+'"></div></div>'+
     '<div class="field" style="margin-top:10px"><label>備註</label><textarea name="note" rows="2">'+v("note")+'</textarea></div>'+
     '<div class="modal-foot">'+(s?'<button type="button" class="btn danger" data-action="deleteSeminar" data-id="'+s.id+'">刪除</button>':'')+'<button class="btn primary" type="submit">儲存</button></div></form>'
   );
   document.getElementById("semForm").addEventListener("submit", function(e){
     e.preventDefault(); var f=e.target;
-    var obj = {name:f.name.value.trim(), seminarDate:f.seminarDate.value, phone:f.phone.value.trim(), email:f.email.value.trim(),
-      signedUpDate:f.signedUpDate.value, lineJoinDate:f.lineJoinDate.value, consultDate:f.consultDate.value, purchaseDate:f.purchaseDate.value, note:f.note.value.trim()};
+    var obj = {name:f.name.value.trim(), seminarDate:f.seminarDate.value,
+      signedUpDate:f.signedUpDate.value, consultDate:f.consultDate.value, purchaseDate:f.purchaseDate.value, note:f.note.value.trim()};
     if(s){ Object.assign(s,obj); } else { DB.seminars.push(Object.assign({id:uid(),deletedAt:null}, obj)); }
     save(); closeModal(); toast("已儲存"); render();
   });
 };
-ACTIONS.deleteSeminar = function(el){ softDelete(DB.seminars, el.getAttribute("data-id")); save(); closeModal(); toast("已刪除"); render(); };
+ACTIONS.deleteSeminar = function(el){
+  if(!confirm("確定要刪除這筆講座名單嗎？")) return;
+  softDelete(DB.seminars, el.getAttribute("data-id")); save(); closeModal(); toast("已刪除"); render();
+};
 ACTIONS.exportSeminar = function(){
-  var rows = alive(DB.seminars).map(function(s){ return [s.name,fmtDate(s.seminarDate),s.phone||"",s.email||"",fmtDate(s.signedUpDate),fmtDate(s.lineJoinDate),fmtDate(s.consultDate),fmtDate(s.purchaseDate),s.note||""]; });
-  exportExcel("知英語_講座名單.xls","講座名單",["姓名","講座日期","電話","Email","報名","加入LINE","諮詢","成交","備註"], rows);
+  var rows = alive(DB.seminars).map(function(s){ return [s.name,fmtDate(s.seminarDate),fmtDate(s.signedUpDate),fmtDate(s.consultDate),fmtDate(s.purchaseDate),s.note||""]; });
+  exportExcel("知英語_講座名單.xls","講座名單",["姓名","講座日期","報名","諮詢","成交","備註"], rows);
   toast("已匯出，共 "+rows.length+" 筆");
 };
 function renderSeminar(){
   var ym = seminarMonth, mf=function(d){return inMonth(d,ym);};
   var all = alive(DB.seminars);
   var funnel = computeFunnel(all, SEMINAR_FIELDS, mf);
+  var wdCount = function(dow){ return all.filter(function(s){ return s.seminarDate && new Date(s.seminarDate+"T00:00:00").getDay()===dow; }).length; };
   var html = '<div class="page-head"><h2>🎤 講座名單 '+helpDot("seminar")+'</h2></div>';
+  html += '<div class="stat-row" style="margin-bottom:14px">'+
+    '<div class="stat-card" style="text-align:center"><div class="s-num">'+wdCount(2)+'</div><div class="s-label">週二總計</div></div>'+
+    '<div class="stat-card" style="text-align:center"><div class="s-num">'+wdCount(4)+'</div><div class="s-label">週四總計</div></div>'+
+    '<div class="stat-card" style="text-align:center"><div class="s-num">'+wdCount(6)+'</div><div class="s-label">週六總計</div></div></div>';
   html += '<div class="card"><div class="page-head" style="margin-bottom:10px"><h2 style="font-size:15px">講座轉化漏斗</h2>'+
     '<div class="head-actions"><button class="btn ghost mini" data-action="seminarMonthPrev">← 上月</button><button class="btn ghost mini" data-action="seminarMonthThis">本月</button><button class="btn ghost mini" data-action="seminarMonthNext">下月 →</button></div></div>';
   html += '<div style="font-weight:800;margin-bottom:10px">'+monthLabel(ym)+'</div>';
@@ -543,13 +606,17 @@ ACTIONS.openSaleModal = function(el){
   });
 };
 ACTIONS.deleteSale = function(el){
+  if(!confirm("確定要刪除這筆成交紀錄嗎？對應的課程學生追蹤列也會一併移除。")) return;
   var id = el.getAttribute("data-id");
   softDelete(DB.sales, id);
   var track = DB.courseTracking.find(function(x){return x.saleId===id;});
   if(track) softDelete(DB.courseTracking, track.id);
   save(); closeModal(); toast("已刪除"); render();
 };
-ACTIONS.deleteTrack = function(el){ softDelete(DB.courseTracking, el.getAttribute("data-id")); save(); toast("已刪除"); render(); };
+ACTIONS.deleteTrack = function(el){
+  if(!confirm("確定要刪除這筆課程學生追蹤列嗎？")) return;
+  softDelete(DB.courseTracking, el.getAttribute("data-id")); save(); toast("已刪除"); render();
+};
 ACTIONS.salesPaySeg = function(el){ salesPay = el.getAttribute("data-pay"); render(); };
 ACTIONS.exportSalesAll = function(){
   var rows = alive(DB.sales).map(function(s){return [s.student,fmtDate(s.purchaseDate),s.amount,s.payMethod,s.course,fmtDate(s.startDate),s.note||""];});
@@ -648,6 +715,36 @@ function runOneOnOneAutoCreate(){
   if(changed) save();
   return changed;
 }
+function runDepositUnpaidReminder(){
+  var changed = false;
+  var today = todayStr();
+  alive(DB.customers).forEach(function(c){
+    if(c.status!=="保證金未付") return;
+    var todoId = "deposit_"+c.id+"_"+today;
+    if(!DB.todos.some(function(t){return t.id===todoId;})){
+      DB.todos.push({id:todoId, title:"保證金未付提醒："+c.name, date:today, done:false, source:"保證金未付自動", createdAt:Date.now(), deletedAt:null});
+      changed = true;
+    }
+  });
+  if(changed) save();
+  return changed;
+}
+function renderTrialCal(){
+  var list = alive(DB.customers).filter(function(c){return c.trialDate;}).sort(function(a,b){
+    return (a.trialDate+((a.trialTime||"00:00"))).localeCompare(b.trialDate+(b.trialTime||"00:00"));
+  });
+  var html = '<div class="page-head"><h2>⏰ 體驗課行事曆 '+helpDot("trialcal")+'</h2></div>';
+  if(!list.length){ html += '<div class="empty-state">目前沒有安排體驗課的學生，到學生資訊填入體驗課日期/時間即可出現在這裡</div>'; }
+  else {
+    html += '<div class="list">'+list.map(function(c){
+      return '<div class="list-item"><div class="li-body"><div class="li-title">'+escapeHtml(c.name)+
+        (c.trialType?' <span class="tag">'+escapeHtml(c.trialType)+'</span>':"")+'</div>'+
+        '<div class="li-meta">'+fmtDate(c.trialDate)+' '+(c.trialTime||"未填時間")+'</div></div>'+
+        '<button class="btn ghost mini" data-action="openCustomerModal" data-id="'+c.id+'">編輯</button></div>';
+    }).join("")+'</div>';
+  }
+  return html;
+}
 ACTIONS.ooQuickPay = function(el){
   var oo = DB.oneOnOne.find(function(x){return x.id===el.getAttribute("data-id");});
   if(!oo) return;
@@ -691,7 +788,10 @@ ACTIONS.openOOModal = function(el){
     save(); closeModal(); toast("已儲存"); render();
   });
 };
-ACTIONS.deleteOO = function(el){ softDelete(DB.oneOnOne, el.getAttribute("data-id")); save(); closeModal(); toast("已刪除"); render(); };
+ACTIONS.deleteOO = function(el){
+  if(!confirm("確定要刪除這位一對一學生的追蹤資料嗎？")) return;
+  softDelete(DB.oneOnOne, el.getAttribute("data-id")); save(); closeModal(); toast("已刪除"); render();
+};
 function renderOneOnOne(){
   var all = alive(DB.oneOnOne).filter(function(o){ return !ooSearch || o.name.indexOf(ooSearch)>-1; });
   var html = '<div class="row" style="margin-bottom:12px"><input id="ooSearchInput" data-action="filterOOSearch" placeholder="搜尋學生姓名..." value="'+escapeHtml(ooSearch)+'"></div>';
@@ -719,24 +819,42 @@ function oneOnOnePrice(n){
   var rate = n>=20?0.8 : n>=10?0.9 : n>=5?0.95 : 1;
   return {rate:rate, total:Math.round(1800*n*rate)};
 }
-ACTIONS.setCalcSessions = function(){
-  calcSessions = Math.max(1, Number(document.getElementById("calcInput").value) || 1);
-  render();
-};
+var GE_PLANS = [
+  {course:"GE40", label:"40堂 一次付", perSession:500, sessions:40, periods:1},
+  {course:"GE40", label:"40堂 分3期", perSession:510, sessions:40, periods:3},
+  {course:"GE80", label:"80堂 一次付", perSession:390, sessions:80, periods:1},
+  {course:"GE80", label:"80堂 分6期", perSession:405, sessions:80, periods:6},
+  {course:"GE120", label:"120堂 一次付", perSession:330, sessions:120, periods:1},
+  {course:"GE120", label:"120堂 分9期", perSession:340, sessions:120, periods:9},
+  {course:"GE160", label:"160堂 一次付", perSession:330, sessions:160, periods:1},
+  {course:"GE160", label:"160堂 分12期", perSession:340, sessions:160, periods:12}
+];
+ACTIONS.setCalcOO = function(){ calcOOSessions = Math.max(1, Number(document.getElementById("calcOOInput").value)||1); render(); };
+ACTIONS.setCalc390 = function(){ calc390Sessions = Math.max(1, Number(document.getElementById("calc390Input").value)||1); render(); };
+ACTIONS.setCalc450 = function(){ calc450Sessions = Math.max(1, Number(document.getElementById("calc450Input").value)||1); render(); };
+ACTIONS.setCalc500 = function(){ calc500Sessions = Math.max(1, Number(document.getElementById("calc500Input").value)||1); render(); };
 function renderCalc(){
-  var n = calcSessions;
-  var oo = oneOnOnePrice(n);
+  var oo = oneOnOnePrice(calcOOSessions);
   var html = '<div class="page-head"><h2>🧮 價格試算 '+helpDot("calc")+'</h2></div>';
-  html += '<div class="card" style="max-width:360px;margin-bottom:16px"><div class="field"><label>堂數</label><input type="number" id="calcInput" data-action="setCalcSessions" min="1" value="'+n+'"></div></div>';
-  html += '<div class="grid-2">'+
-    '<div class="card"><div style="font-size:12px;color:var(--muted)">一對一（原價 $1800/堂，5堂95折/10堂9折/20堂以上8折）</div>'+
-    '<div style="font-size:22px;font-weight:800;color:var(--primary-dark);margin-top:4px">NT$ '+oo.total.toLocaleString()+'</div>'+
-    '<div style="font-size:11.5px;color:var(--muted);margin-top:2px">折扣：'+Math.round((1-oo.rate)*100)+'%　單堂約 NT$ '+Math.round(oo.total/n).toLocaleString()+'</div></div>'+
-    '<div class="card"><div style="font-size:12px;color:var(--muted)">固定費率方案</div>'+
-    [390,450,500].map(function(rate){
-      return '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:14px"><span>$'+rate+' × '+n+' 堂</span><b>NT$ '+(rate*n).toLocaleString()+'</b></div>';
-    }).join("")+
-    '</div></div>';
+  html += '<div class="grid-2">';
+  html += '<div class="card"><div style="font-size:12px;color:var(--muted)">一對一（原價 $1800/堂，5堂95折/10堂9折/20堂以上8折）</div>'+
+    '<div class="field" style="margin-top:8px;max-width:180px"><label>堂數</label><input type="number" id="calcOOInput" data-action="setCalcOO" min="1" value="'+calcOOSessions+'"></div>'+
+    '<div style="font-size:22px;font-weight:800;color:var(--primary-dark);margin-top:8px">NT$ '+oo.total.toLocaleString()+'</div>'+
+    '<div style="font-size:11.5px;color:var(--muted);margin-top:2px">折扣：'+Math.round((1-oo.rate)*100)+'%　單堂約 NT$ '+Math.round(oo.total/calcOOSessions).toLocaleString()+'</div></div>';
+  [[390,"calc390Input","setCalc390",calc390Sessions],[450,"calc450Input","setCalc450",calc450Sessions],[500,"calc500Input","setCalc500",calc500Sessions]].forEach(function(row){
+    var rate=row[0], inputId=row[1], action=row[2], n=row[3];
+    html += '<div class="card"><div style="font-size:12px;color:var(--muted)">實力打造 $'+rate+'/堂</div>'+
+      '<div class="field" style="margin-top:8px;max-width:180px"><label>堂數</label><input type="number" id="'+inputId+'" data-action="'+action+'" min="1" value="'+n+'"></div>'+
+      '<div style="font-size:22px;font-weight:800;color:var(--primary-dark);margin-top:8px">NT$ '+(rate*n).toLocaleString()+'</div></div>';
+  });
+  html += '</div>';
+  html += '<div class="page-head" style="margin-top:20px"><h2 style="font-size:16px">GE 預設套餐</h2></div>';
+  html += '<div class="table-wrap"><table class="tbl"><thead><tr><th>課程</th><th>方案</th><th>單堂價</th><th>總價</th><th>期數</th><th>每期金額</th></tr></thead><tbody>'+
+    GE_PLANS.map(function(p){
+      var total = p.perSession*p.sessions;
+      var perPeriod = p.periods>1 ? Math.round(total/p.periods) : total;
+      return '<tr><td>'+p.course+'</td><td>'+p.label+'</td><td>$'+p.perSession+'</td><td>NT$ '+total.toLocaleString()+'</td><td>'+p.periods+'</td><td>NT$ '+perPeriod.toLocaleString()+'</td></tr>';
+    }).join("")+'</tbody></table></div>';
   return html;
 }
 
@@ -751,7 +869,10 @@ ACTIONS.toggleTodo = function(el){
   var t = DB.todos.find(function(x){return x.id===el.getAttribute("data-id");});
   if(t){ t.done = !t.done; save(); render(); }
 };
-ACTIONS.deleteTodo = function(el){ softDelete(DB.todos, el.getAttribute("data-id")); save(); render(); };
+ACTIONS.deleteTodo = function(el){
+  if(!confirm("確定要刪除這筆待辦嗎？")) return;
+  softDelete(DB.todos, el.getAttribute("data-id")); save(); render();
+};
 function renderTodos(){
   var all = alive(DB.todos).sort(function(a,b){ return (a.done-b.done) || (a.date||"").localeCompare(b.date||""); });
   var html = '<div class="page-head"><h2>✅ 待辦提醒 '+helpDot("todo")+'</h2></div>';
@@ -775,13 +896,19 @@ ACTIONS.addCourseChip = function(){
   var v = input.value.trim(); if(!v){toast("請輸入課程名稱");return;}
   DB.courses.push(v); input.value=""; save(); render();
 };
-ACTIONS.removeCourseChip = function(el){ DB.courses.splice(+el.getAttribute("data-i"),1); save(); render(); };
+ACTIONS.removeCourseChip = function(el){
+  if(!confirm("確定要移除這個課程選項嗎？（不會影響已經存在的成交紀錄）")) return;
+  DB.courses.splice(+el.getAttribute("data-i"),1); save(); render();
+};
 ACTIONS.addPayChip = function(){
   var input = document.getElementById("newPayInput");
   var v = input.value.trim(); if(!v){toast("請輸入付款方式");return;}
   DB.payMethods.push(v); input.value=""; save(); render();
 };
-ACTIONS.removePayChip = function(el){ DB.payMethods.splice(+el.getAttribute("data-i"),1); save(); render(); };
+ACTIONS.removePayChip = function(el){
+  if(!confirm("確定要移除這個付款方式嗎？（不會影響已經存在的成交紀錄）")) return;
+  DB.payMethods.splice(+el.getAttribute("data-i"),1); save(); render();
+};
 ACTIONS.closeModal = function(){ closeModal(); };
 function renderSettings(){
   var html = '<div class="page-head"><h2>⚙️ 設定</h2></div>';
