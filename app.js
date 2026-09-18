@@ -147,7 +147,6 @@ var HELP = {
   calendar:{t:"日曆紀錄", w:"以月曆檢視每天有哪些學生加入LINE、Intro、體驗/線上講座、Demo或已購買。", h:"點日曆格子查看當天紀錄；『＋新增學生』以該天為加入LINE日期新增；『匯出本週週報』整理當週Intro/Demo成Excel。", r:"角標數字即時反映最新資料。", u:"到學生資訊編輯或刪除該學生即可。", e:"沒有角標代表當天沒有任何關鍵日期紀錄。"},
   student:{t:"學生資訊／轉換率儀表板", w:"追蹤每位學生從加入LINE到成交的歷程，並計算月度轉換率。", h:"『＋新增學生』填寫各階段日期；卡片狀態下拉可快速更新（會自動補上對應日期）。", r:"轉換率圖表依所選月份即時計算，可匯出報表。", u:"點卡片『查看/編輯』修改或刪除。", e:"轉換率0%通常代表尚無人到達下一步。"},
   seminar:{t:"講座名單", w:"追蹤『報名→加入LINE→諮詢→成交』四段轉換率。", h:"『＋新增』登記報名者與各階段日期；可依月份切換、匯出Excel。", r:"漏斗與轉換率即時計算。", u:"清單可編輯或刪除。", e:"都是0請確認報名日期是否已填。"},
-  linejoin:{t:"LINE 加入名單", w:"最快記錄『誰加入了官方LINE』，只要打名字，系統自動按週/月統計。", h:"輸入後Enter或點新增；可再『建立學生記錄』轉成完整學生卡片。", r:"立即計入本週/本月統計。", u:"刪除該筆即可。", e:"數字看起來不對請檢查日期是否跨週/月。"},
   track:{t:"課程學生追蹤", w:"成交紀錄自動同步到這裡；課程含『30hrs』且填了開課/結束日期會自動產生待辦。", h:"開課/結束日期要到銷售管理編輯。", r:"30hrs自動待辦會出現在『待辦提醒』。", u:"刪除此列不影響原始成交紀錄。", e:"沒看到自動待辦請確認課程名稱含『30hrs』。"},
   sales:{t:"銷售管理", w:"記錄每筆成交，自動同步課程學生追蹤。", h:"『＋新增成交紀錄』填寫；付款方式可篩選並個別匯出。", r:"計入總營收與客單價。", u:"刪除會一併移除對應課程追蹤列。", e:"客單價異常請檢查金額輸入。"},
   todo:{t:"待辦提醒", w:"顯示手動新增的提醒，以及30hrs課程自動產生的5條待辦規則。", h:"可手動新增；勾選完成；30hrs自動待辦無法手動刪除文字但可勾完成或刪除整筆。", r:"完成後會標記已完成，仍保留在清單。", u:"取消勾選即可復原。", e:"若預期的自動待辦沒出現，檢查課程學生追蹤是否填了開課/結束日期。"}
@@ -177,8 +176,8 @@ var NAV = [
   {key:"cal", label:"日曆紀錄", ico:"📅"},
   {key:"students", label:"學生資訊", ico:"🎓"},
   {key:"seminar", label:"講座名單", ico:"🎤"},
-  {key:"linejoin", label:"LINE加入名單", ico:"📥"},
-  {key:"track_sales", label:"課程/銷售", ico:"💳"},
+  {key:"track", label:"課程學生追蹤", ico:"📘"},
+  {key:"sales", label:"銷售管理", ico:"💳"},
   {key:"todo", label:"待辦提醒", ico:"✅"},
   {key:"settings", label:"設定", ico:"⚙️"}
 ];
@@ -210,7 +209,7 @@ function render(){
   }).join("");
   document.querySelectorAll("[data-nav]").forEach(function(b){ b.onclick = function(){ currentNav = b.getAttribute("data-nav"); render(); }; });
   var main = document.getElementById("mainArea");
-  var renderers = {cal:renderCalendar, students:renderStudents, seminar:renderSeminar, linejoin:renderLineJoins, track_sales:renderSales, todo:renderTodos, settings:renderSettings};
+  var renderers = {cal:renderCalendar, students:renderStudents, seminar:renderSeminar, track:renderTrack, sales:renderSales, todo:renderTodos, settings:renderSettings};
   main.innerHTML = renderers[currentNav]();
   bindActions();
 }
@@ -463,42 +462,6 @@ function renderSeminar(){
   return html;
 }
 
-/* ============= LINE 加入名單 ============= */
-ACTIONS.addLineJoin = function(){
-  var input = document.getElementById("lineJoinInput");
-  var name = input.value.trim();
-  if(!name){ toast("請輸入LINE名字"); return; }
-  DB.lineJoins.push({id:uid(), lineName:name, date:todayStr(), promoted:false, deletedAt:null});
-  input.value=""; save(); render();
-};
-ACTIONS.deleteLineJoin = function(el){ softDelete(DB.lineJoins, el.getAttribute("data-id")); save(); render(); };
-ACTIONS.promoteLineJoin = function(el){
-  var j = DB.lineJoins.find(function(x){return x.id===el.getAttribute("data-id");});
-  if(!j) return;
-  DB.customers.push({id:uid(), name:j.lineName, status:"進到官方LINE", lineJoinDate:j.date, note:"", deletedAt:null});
-  j.promoted = true; save(); toast("已建立學生記錄："+j.lineName); render();
-};
-function renderLineJoins(){
-  var all = alive(DB.lineJoins).sort(function(a,b){return b.date.localeCompare(a.date);});
-  var today = todayStr(), wr = weekRangeOf(today);
-  var weekCount = all.filter(function(j){return inWeek(j.date,wr);}).length;
-  var monthCount = all.filter(function(j){return inMonth(j.date, today.slice(0,7));}).length;
-  var html = '<div class="page-head"><h2>📥 LINE 加入名單 '+helpDot("linejoin")+'</h2></div>';
-  html += '<div class="card"><div class="row" style="margin-bottom:10px"><input id="lineJoinInput" placeholder="輸入LINE名字，Enter新增"><button class="btn primary" data-action="addLineJoin">新增</button></div>'+
-    '<div class="stat-row"><div class="stat-card" style="text-align:center"><div class="s-num">'+weekCount+'</div><div class="s-label">本週(一~日)加入</div></div>'+
-    '<div class="stat-card" style="text-align:center"><div class="s-num">'+monthCount+'</div><div class="s-label">本月加入</div></div></div></div>';
-  html += '<div class="page-head" style="margin-top:16px"><h2 style="font-size:16px">名單清單</h2></div>';
-  if(!all.length){ html += '<div class="empty-state">還沒有人加入LINE</div>'; }
-  else {
-    html += '<div class="list">'+all.map(function(j){
-      return '<div class="list-item"><div class="li-body"><div class="li-title">'+escapeHtml(j.lineName)+'</div><div class="li-meta">'+fmtDate(j.date)+(j.promoted?' <span class="badge" style="background:var(--green-soft);color:var(--green)">已建立學生</span>':'')+'</div></div>'+
-        (!j.promoted?'<button class="btn ghost mini" data-action="promoteLineJoin" data-id="'+j.id+'">建立學生記錄</button>':'')+
-        '<button class="btn ghost mini" data-action="deleteLineJoin" data-id="'+j.id+'">刪除</button></div>';
-    }).join("")+'</div>';
-  }
-  return html;
-}
-
 /* ============= 課程/銷售 ============= */
 function courseOptionsHtml(sel){
   var list = DB.courses;
@@ -575,10 +538,13 @@ function renderSales(){
         '<button class="btn ghost mini" data-action="openSaleModal" data-id="'+s.id+'">編輯</button></div>';
     }).join("")+'</div>';
   }
-  html += '<div class="page-head" style="margin-top:20px"><h2 style="font-size:16px">📘 課程學生追蹤 '+helpDot("track")+'</h2></div>';
-  html += '<div class="card" style="margin-bottom:14px;background:var(--primary-soft);font-size:12.5px"><b>30hrs 自動待辦：</b>課程含「30hrs」且填了開課/結束日期，系統會自動在「待辦提醒」產生第2週提醒、結束前一週提醒、結束後一週提醒共5條規則。</div>';
+  return html;
+}
+function renderTrack(){
+  var html = '<div class="page-head"><h2>📘 課程學生追蹤 '+helpDot("track")+'</h2></div>';
+  html += '<div class="card" style="margin-bottom:14px;background:var(--primary-soft);font-size:12.5px"><b>30hrs 自動待辦：</b>課程含「30hrs」且填了開課/結束日期，系統會自動在「待辦提醒」產生第2週提醒、結束前一週提醒、結束後一週提醒共5條規則。開課/結束日期要到「銷售管理」的成交紀錄裡編輯。</div>';
   var tracks = alive(DB.courseTracking);
-  if(!tracks.length){ html += '<div class="empty-state">尚無已購課學生</div>'; }
+  if(!tracks.length){ html += '<div class="empty-state">尚無已購課學生（在銷售管理新增成交紀錄會自動同步過來）</div>'; }
   else {
     html += '<div class="table-wrap"><table class="tbl"><thead><tr><th>姓名</th><th>課程</th><th>開課</th><th>結束</th><th></th></tr></thead><tbody>'+
       tracks.map(function(t){
